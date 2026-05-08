@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Outline Navigator
 // @namespace    http://tampermonkey.net/
-// @version      2.2.2
+// @version      2.2.3
 // @description  为 ChatGPT 添加可折叠侧边目录，支持 Alt+C 快捷键切换显示
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -30,7 +30,7 @@
     /* ── 面板 ── */
     #gpt-toc-panel {
       --toc-panel-right: max(18px, env(safe-area-inset-right));
-      --toc-panel-width: clamp(236px, 17vw, 292px);
+      --toc-panel-width: clamp(210px, 14vw, 252px);
       position: fixed;
       top: 50%;
       right: var(--toc-panel-right);
@@ -343,8 +343,8 @@
       return;
     }
 
-    const viewportMargin = clampNumber(Math.round(vw * 0.018), 16, 34);
-    const desiredWidth = clampNumber(Math.round(vw * 0.17), 236, 292);
+    const viewportMargin = clampNumber(Math.round(vw * 0.024), 24, 56);
+    const desiredWidth = clampNumber(Math.round(vw * 0.14), 210, 252);
     const gap = 16;
     const contentRight = getVisibleContentRight(vw, vh);
     const rightRail = vw - contentRight - viewportMargin;
@@ -353,7 +353,8 @@
     let panelWidth = desiredWidth;
 
     if (rightRail >= desiredWidth + gap) {
-      panelRight = Math.max(viewportMargin, Math.round(vw - contentRight - desiredWidth - gap));
+      const railRight = Math.round(vw - contentRight - desiredWidth - gap);
+      panelRight = clampNumber(railRight, viewportMargin, Math.round(vw * 0.18));
     } else if (vw < 1100) {
       panelWidth = Math.min(desiredWidth, vw - viewportMargin * 2);
     }
