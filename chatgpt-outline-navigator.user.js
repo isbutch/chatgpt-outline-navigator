@@ -1,0 +1,712 @@
+// ==UserScript==
+// @name         ChatGPT Outline Navigator
+// @namespace    http://tampermonkey.net/
+// @version      2.2.0
+// @description  为 ChatGPT 添加可折叠侧边目录，支持 Alt+C 快捷键切换，参考图片风格
+// @author       ooh
+// @match        https://chatgpt.com/*
+// @match        https://chat.openai.com/*
+// @compatible   chrome
+// @compatible   edge
+// @grant        GM_addStyle
+// @run-at       document-idle
+// ==/UserScript==
+
+(function () {
+  'use strict';
+
+  function addStyle(css) {
+    if (typeof GM_addStyle === 'function') {
+      GM_addStyle(css);
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.textContent = css;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  // ─── 样式 ────────────────────────────────────────────────────────────────────
+  addStyle(`
+    /* ── 面板 ── */
+    #gpt-toc-panel {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      bottom: 48px;
+      width: clamp(280px, 20vw, 330px);
+      max-height: calc(100vh - 62px);
+      background: #101010;
+      color: #f4f4f4;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 22px;
+      box-shadow: 0 18px 48px rgba(0,0,0,0.46);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      font-size: 13px;
+      transform: translateX(calc(100% + 28px));
+      opacity: 0;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+      overflow: hidden;
+    }
+    #gpt-toc-panel.open {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    /* ── 面板头部 ── */
+    #gpt-toc-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    #gpt-toc-panel-title {
+      color: #8d8d8d;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    #gpt-toc-close-btn {
+      background: none;
+      border: none;
+      color: #777;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 2px 0 2px 8px;
+      transition: color 0.15s;
+    }
+    #gpt-toc-close-btn:hover { color: #fff; }
+
+    /* ── 滚动区（隐藏滚动条） ── */
+    #gpt-toc-scroll {
+      flex: 1;
+      overflow-y: scroll;
+      padding: 10px 14px 72px;
+      scrollbar-width: none;          /* Firefox */
+      -ms-overflow-style: none;       /* IE/Edge */
+    }
+    #gpt-toc-scroll::-webkit-scrollbar {
+      display: none;                  /* Chrome/Safari */
+    }
+
+    /* ── 会话分组 ── */
+    .toc-session {
+      margin-bottom: 8px;
+    }
+
+    /* 会话标题行（用户提问） */
+    .toc-session-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 10px 10px 8px;
+      cursor: pointer;
+      gap: 10px;
+      border-radius: 12px;
+      transition: background 0.15s;
+    }
+    .toc-session-header:hover {
+      background: rgba(255,255,255,0.06);
+    }
+    .toc-session-title {
+      color: #f4f4f4;
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.35;
+      flex: 1;
+      word-break: break-all;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .toc-chevron {
+      color: #d8d8d8;
+      font-size: 12px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      transition: transform 0.2s;
+      user-select: none;
+    }
+    .toc-session.collapsed .toc-chevron {
+      transform: rotate(-90deg);
+    }
+
+    /* 会话内容区 */
+    .toc-session-body {
+      overflow: hidden;
+      padding: 0 0 4px;
+    }
+    .toc-session.collapsed .toc-session-body {
+      display: none;
+    }
+
+    /* ── 标题项 ── */
+    .toc-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      cursor: pointer;
+      padding: 7px 8px 7px 0;
+      color: #d3d3d3;
+      line-height: 1.45;
+      gap: 8px;
+      transition: color 0.15s, background 0.15s;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      border-radius: 10px;
+    }
+    .toc-heading:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .toc-heading.active { color: #fff; background: rgba(255,255,255,0.08); font-weight: 700; }
+
+    .toc-heading-text {
+      flex: 1;
+      word-break: break-all;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .toc-heading .toc-chevron {
+      margin-top: 2px;
+    }
+
+    /* 缩进层级 */
+    .toc-h1 .toc-heading { padding-left: 10px; font-size: 13.5px; color: #eee; font-weight: 700; }
+    .toc-h2 .toc-heading { padding-left: 22px; font-size: 13px; color: #ddd; font-weight: 700; }
+    .toc-h3 .toc-heading { padding-left: 38px; font-size: 12.5px; color: #bdbdbd; }
+    .toc-h4 .toc-heading { padding-left: 52px; font-size: 12px; color: #9c9c9c; }
+
+    /* h2 折叠子项 */
+    .toc-h2-group { }
+    .toc-h2-group.collapsed .toc-h2-children {
+      display: none;
+    }
+    .toc-h2-group.collapsed .toc-chevron {
+      transform: rotate(-90deg);
+    }
+
+    /* 会话间分割线 */
+    .toc-session-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+      margin: 8px 4px;
+    }
+
+    /* 空状态 */
+    .toc-empty {
+      padding: 20px 10px;
+      color: #777;
+      font-size: 12px;
+      font-style: italic;
+    }
+
+    /* ── 悬浮 FAB 按钮 ── */
+    #gpt-toc-fab {
+      position: fixed;
+      bottom: 24px;
+      right: 20px;
+      z-index: 10000;
+      background: #fff;
+      color: #111;
+      border: none;
+      border-radius: 999px;
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.35);
+      transition: background 0.15s, transform 0.1s;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      user-select: none;
+    }
+    #gpt-toc-fab:hover {
+      background: #f0f0f0;
+      transform: scale(1.03);
+    }
+    #gpt-toc-fab:active { transform: scale(0.97); }
+    #gpt-toc-fab .fab-icon { font-size: 15px; }
+    #gpt-toc-fab .fab-label { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; }
+    #gpt-toc-fab .fab-shortcut {
+      font-size: 11px;
+      color: #888;
+      font-weight: 500;
+      margin-left: 2px;
+    }
+
+    /* 面板打开时 FAB 保留，用于快速收起 */
+    #gpt-toc-panel.open ~ #gpt-toc-fab,
+    body.toc-open #gpt-toc-fab {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @media (max-width: 720px) {
+      #gpt-toc-panel {
+        top: 12px;
+        right: 12px;
+        bottom: 68px;
+        width: calc(100vw - 24px);
+        max-height: calc(100vh - 80px);
+        border-radius: 20px;
+      }
+      #gpt-toc-fab {
+        right: 14px;
+        bottom: 16px;
+      }
+    }
+  `);
+
+  // ─── DOM 构建 ─────────────────────────────────────────────────────────────────
+
+  // 面板
+  const panel = document.createElement('div');
+  panel.id = 'gpt-toc-panel';
+  panel.innerHTML = `
+    <div id="gpt-toc-panel-header">
+      <span id="gpt-toc-panel-title">目录 · TOC</span>
+      <button id="gpt-toc-close-btn" title="关闭 (Alt+C)">✕</button>
+    </div>
+    <div id="gpt-toc-scroll"></div>
+  `;
+  document.body.appendChild(panel);
+
+  // FAB 按钮
+  const fab = document.createElement('button');
+  fab.id = 'gpt-toc-fab';
+  fab.innerHTML = `<span class="fab-icon">📄</span><span class="fab-label">TOC</span><span class="fab-shortcut">Alt+C</span>`;
+  document.body.appendChild(fab);
+
+  const scrollEl = document.getElementById('gpt-toc-scroll');
+  const closeBtn = document.getElementById('gpt-toc-close-btn');
+  const headingById = new Map();
+  const promptTextCache = new WeakMap();
+  let activeHeadingBtn = null;
+
+  // ─── 开关逻辑 ─────────────────────────────────────────────────────────────────
+  function openTOC() {
+    panel.classList.add('open');
+    document.body.classList.add('toc-open');
+    lastTOCSignature = null;
+    startTOCObserver();
+    refresh();
+  }
+  function closeTOC() {
+    panel.classList.remove('open');
+    document.body.classList.remove('toc-open');
+    stopTOCObserver();
+    stopHighlight();
+    clearRouteRefreshTimers();
+  }
+  function toggleTOC() {
+    panel.classList.contains('open') ? closeTOC() : openTOC();
+  }
+
+  fab.addEventListener('click', toggleTOC);
+  closeBtn.addEventListener('click', closeTOC);
+  scrollEl.addEventListener('click', handleTOCClick);
+
+  // Alt+C 快捷键
+  document.addEventListener('keydown', (e) => {
+    if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      toggleTOC();
+    }
+  });
+
+  // ─── 数据收集 ─────────────────────────────────────────────────────────────────
+
+  function getConversationTurns() {
+    const turns = [];
+
+    const messages = document.querySelectorAll('[data-message-author-role]');
+    let currentPrompt = '';
+
+    messages.forEach(message => {
+      const role = message.getAttribute('data-message-author-role');
+
+      if (role === 'user') {
+        currentPrompt = extractPromptText(message);
+        return;
+      }
+
+      if (role !== 'assistant') return;
+
+      const container = message.closest('article') || message;
+      const mdBody = container.querySelector('.markdown, .prose') || message.querySelector('.markdown, .prose');
+      if (!mdBody) return;
+
+      const headingEls = mdBody.querySelectorAll('h1,h2,h3,h4');
+      if (headingEls.length === 0) return;
+
+      const headings = [];
+      headingEls.forEach((el, i) => {
+        if (!el.id) el.id = `gpt-toc-h-${turns.length}-${i}`;
+        headings.push({
+          id: el.id,
+          level: parseInt(el.tagName[1]),
+          text: el.textContent.trim(),
+          el,
+        });
+      });
+
+      const prompt = currentPrompt || `对话 ${turns.length + 1}`;
+      turns.push({
+        userText: prompt,
+        summary: makeConversationSummary(prompt, turns.length),
+        headings,
+      });
+      currentPrompt = '';
+    });
+
+    // 兼容旧版 DOM（无 article）
+    if (turns.length === 0) {
+      const bodies = document.querySelectorAll(
+        '[data-message-author-role="assistant"] .markdown, ' +
+        '[data-message-author-role="assistant"] .prose, ' +
+        '.agent-turn .markdown'
+      );
+      bodies.forEach((body, bi) => {
+        const headingEls = body.querySelectorAll('h1,h2,h3,h4');
+        if (!headingEls.length) return;
+        const headings = [];
+        headingEls.forEach((el, i) => {
+          if (!el.id) el.id = `gpt-toc-h-${bi}-${i}`;
+          headings.push({ id: el.id, level: parseInt(el.tagName[1]), text: el.textContent.trim(), el });
+        });
+        turns.push({
+          userText: `对话 ${bi + 1}`,
+          summary: `对话 ${bi + 1}`,
+          headings,
+        });
+      });
+    }
+
+    return turns;
+  }
+
+  // ─── 渲染 ─────────────────────────────────────────────────────────────────────
+
+  function buildSessionNode(turn, sessionIdx) {
+    const session = document.createElement('div');
+    session.className = 'toc-session';
+
+    // 头部（用户提问）
+    const header = document.createElement('div');
+    header.className = 'toc-session-header';
+    header.title = turn.userText || turn.summary;
+    header.innerHTML = `
+      <span class="toc-session-title">${escHtml(turn.summary || turn.userText)}</span>
+      <span class="toc-chevron">∨</span>
+    `;
+    session.appendChild(header);
+
+    // 内容区
+    const body = document.createElement('div');
+    body.className = 'toc-session-body';
+
+    // 将标题组织成树：h2 可折叠包裹其 h3/h4 子项
+    let i = 0;
+    const headings = turn.headings;
+    while (i < headings.length) {
+      const h = headings[i];
+
+      if (h.level <= 2) {
+        // h1 / h2：检查后续是否有 h3/h4 子项
+        const children = [];
+        let j = i + 1;
+        while (j < headings.length && headings[j].level > h.level && headings[j].level >= 3) {
+          children.push(headings[j]);
+          j++;
+        }
+
+        if (h.level === 2 && children.length > 0) {
+          // 可折叠的 h2 组
+          const group = document.createElement('div');
+          group.className = 'toc-h2-group';
+
+          const hBtn = makeHeadingBtn(h, true);
+          group.appendChild(hBtn);
+
+          const childrenWrap = document.createElement('div');
+          childrenWrap.className = 'toc-h2-children';
+          children.forEach(ch => {
+            const cb = makeHeadingBtn(ch, false);
+            childrenWrap.appendChild(cb);
+          });
+          group.appendChild(childrenWrap);
+          body.appendChild(group);
+          i = j;
+        } else {
+          const btn = makeHeadingBtn(h, false);
+          body.appendChild(btn);
+          i++;
+        }
+      } else {
+        // 孤立的 h3/h4
+        const btn = makeHeadingBtn(h, false);
+        body.appendChild(btn);
+        i++;
+      }
+    }
+
+    session.appendChild(body);
+    return session;
+  }
+
+  function makeHeadingBtn(h, hasChevron) {
+    const wrap = document.createElement('div');
+    wrap.className = `toc-h${h.level}`;
+    wrap.dataset.targetId = h.id;
+
+    const btn = document.createElement('button');
+    btn.className = 'toc-heading';
+    btn.innerHTML = `
+      <span class="toc-heading-text">${escHtml(h.text)}</span>
+      ${hasChevron ? '<span class="toc-chevron">∨</span>' : ''}
+    `;
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function scrollTo(h) {
+    h.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveHeading(h.id);
+  }
+
+  function renderTOC(turns) {
+    headingById.clear();
+    activeHeadingBtn = null;
+    scrollEl.innerHTML = '';
+
+    if (!turns.length) {
+      scrollEl.innerHTML = '<div class="toc-empty">暂无标题内容<br>AI 回复中使用 ## 标题语法后自动显示</div>';
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    turns.forEach((turn, idx) => {
+      if (idx > 0) {
+        fragment.appendChild(Object.assign(document.createElement('div'), { className: 'toc-session-divider' }));
+      }
+      turn.headings.forEach(h => headingById.set(h.id, h));
+      fragment.appendChild(buildSessionNode(turn, idx));
+    });
+    scrollEl.appendChild(fragment);
+  }
+
+  function handleTOCClick(e) {
+    const sessionHeader = e.target.closest('.toc-session-header');
+    if (sessionHeader) {
+      sessionHeader.closest('.toc-session')?.classList.toggle('collapsed');
+      return;
+    }
+
+    const headingBtn = e.target.closest('.toc-heading');
+    if (!headingBtn) return;
+
+    const h2Group = headingBtn.closest('.toc-h2-group');
+    if (h2Group && e.target.closest('.toc-chevron')) {
+      h2Group.classList.toggle('collapsed');
+      return;
+    }
+
+    const targetId = headingBtn.closest('[data-target-id]')?.dataset.targetId;
+    const heading = targetId ? headingById.get(targetId) : null;
+    if (heading) scrollTo(heading);
+  }
+
+  function setActiveHeading(id) {
+    if (activeHeadingBtn) activeHeadingBtn.classList.remove('active');
+    activeHeadingBtn = scrollEl.querySelector(`[data-target-id="${id}"] .toc-heading`);
+    if (activeHeadingBtn) activeHeadingBtn.classList.add('active');
+  }
+
+  // ─── 滚动高亮 ─────────────────────────────────────────────────────────────────
+  let intersectionObs = null;
+
+  function setupHighlight(turns) {
+    stopHighlight();
+    const allHeadings = turns.flatMap(t => t.headings);
+    if (!allHeadings.length) return;
+
+    intersectionObs = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          setActiveHeading(entry.target.id);
+        }
+      });
+    }, { threshold: 0.4 });
+
+    allHeadings.forEach(h => intersectionObs.observe(h.el));
+  }
+
+  function stopHighlight() {
+    if (!intersectionObs) return;
+    intersectionObs.disconnect();
+    intersectionObs = null;
+  }
+
+  // ─── 刷新入口 ─────────────────────────────────────────────────────────────────
+  let refreshTimer = null;
+  let routeRefreshTimers = [];
+  let lastTOCSignature = null;
+  let lastKnownUrl = location.href;
+  function refresh() {
+    const turns = getConversationTurns();
+    const signature = makeTOCSignature(turns);
+    if (signature === lastTOCSignature) return;
+    lastTOCSignature = signature;
+    renderTOC(turns);
+    setupHighlight(turns);
+  }
+  function scheduleRefresh() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(refresh, 450);
+  }
+
+  // ─── DOM 变化监听 ─────────────────────────────────────────────────────────────
+  let tocObserver = null;
+  function startTOCObserver() {
+    if (tocObserver) return;
+    const target = document.querySelector('main') || document.body;
+    tocObserver = new MutationObserver(muts => {
+      const hasContentChange = muts.some(isRelevantMutation);
+      if (hasContentChange) scheduleRefresh();
+    });
+    tocObserver.observe(target, { childList: true, characterData: true, subtree: true });
+  }
+
+  function stopTOCObserver() {
+    if (!tocObserver) return;
+    tocObserver.disconnect();
+    tocObserver = null;
+    clearTimeout(refreshTimer);
+  }
+
+  function clearRouteRefreshTimers() {
+    routeRefreshTimers.forEach(timer => clearTimeout(timer));
+    routeRefreshTimers = [];
+  }
+
+  function handleRouteChange() {
+    if (location.href === lastKnownUrl) return;
+    lastKnownUrl = location.href;
+    lastTOCSignature = null;
+    clearTimeout(refreshTimer);
+    clearRouteRefreshTimers();
+    stopHighlight();
+
+    if (!panel.classList.contains('open')) {
+      stopTOCObserver();
+      scrollEl.innerHTML = '';
+      return;
+    }
+
+    stopTOCObserver();
+    scrollEl.innerHTML = '<div class="toc-empty">正在加载当前会话目录...</div>';
+    rebindTOCObserver();
+
+    [200, 800, 1800, 3500].forEach(delay => {
+      routeRefreshTimers.push(setTimeout(() => {
+        rebindTOCObserver();
+        refresh();
+      }, delay));
+    });
+  }
+
+  function rebindTOCObserver() {
+    stopTOCObserver();
+    startTOCObserver();
+  }
+
+  const rawPushState = history.pushState;
+  history.pushState = function (...args) {
+    const ret = rawPushState.apply(this, args);
+    handleRouteChange();
+    return ret;
+  };
+
+  const rawReplaceState = history.replaceState;
+  history.replaceState = function (...args) {
+    const ret = rawReplaceState.apply(this, args);
+    handleRouteChange();
+    return ret;
+  };
+
+  window.addEventListener('popstate', handleRouteChange);
+  setInterval(handleRouteChange, 600);
+
+  // ─── 工具函数 ─────────────────────────────────────────────────────────────────
+  function extractPromptText(message) {
+    if (promptTextCache.has(message)) return promptTextCache.get(message);
+
+    const clone = message.cloneNode(true);
+    clone.querySelectorAll('button, svg, [aria-hidden="true"], .sr-only').forEach(el => el.remove());
+    const text = clone.textContent.trim().replace(/\s+/g, ' ');
+    promptTextCache.set(message, text);
+    return text;
+  }
+
+  function isRelevantMutation(mutation) {
+    const target = mutation.target.nodeType === Node.ELEMENT_NODE
+      ? mutation.target
+      : mutation.target.parentElement;
+
+    if (!target || panel.contains(target) || fab.contains(target)) return false;
+
+    if (mutation.type === 'characterData') {
+      return Boolean(target.closest('[data-message-author-role="assistant"], .markdown, .prose'));
+    }
+
+    if (mutation.type !== 'childList') return false;
+
+    const changedNodes = [...mutation.addedNodes, ...mutation.removedNodes];
+    return changedNodes.some(node => {
+      const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      if (!el || panel.contains(el) || fab.contains(el)) return false;
+      return Boolean(
+        el.matches?.('[data-message-author-role], article, .markdown, .prose, h1, h2, h3, h4') ||
+        el.querySelector?.('[data-message-author-role], article, .markdown, .prose, h1, h2, h3, h4')
+      );
+    });
+  }
+
+  function makeConversationSummary(userText, index) {
+    const source = (userText || `对话 ${index + 1}`)
+      .replace(/\s+/g, ' ')
+      .replace(/```[\s\S]*?```/g, '')
+      .trim();
+
+    if (!source) return `对话 ${index + 1}`;
+
+    const clean = source
+      .replace(/^(请|帮我|帮忙|需要|当前需要|现在需要|如何|怎么)\s*/u, '')
+      .replace(/[。！？!?].*$/u, '')
+      .trim();
+
+    const text = clean || source;
+    return text.length > 28 ? `${text.slice(0, 28)}...` : text;
+  }
+
+  function makeTOCSignature(turns) {
+    return turns.map(turn => `${turn.summary}:${turn.headings.map(h => `${h.level}-${h.text}`).join('|')}`).join('\n');
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+})();
