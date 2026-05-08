@@ -1,9 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT Outline Navigator
 // @namespace    http://tampermonkey.net/
-// @version      2.2.0
-// @description  为 ChatGPT 添加可折叠侧边目录，支持 Alt+C 快捷键切换，参考图片风格
-// @author       ooh
+// @version      2.2.1
+// @description  为 ChatGPT 添加可折叠侧边目录，支持 Alt+C 快捷键切换显示
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @compatible   chrome
@@ -31,28 +30,29 @@
     /* ── 面板 ── */
     #gpt-toc-panel {
       position: fixed;
-      top: 14px;
-      right: 14px;
-      bottom: 48px;
-      width: clamp(280px, 20vw, 330px);
-      max-height: calc(100vh - 62px);
+      top: 50%;
+      right: max(34px, env(safe-area-inset-right));
+      bottom: auto;
+      width: clamp(236px, 17vw, 292px);
+      height: min(72vh, 680px);
+      max-height: calc(100vh - 108px);
       background: #101010;
       color: #f4f4f4;
       border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 22px;
-      box-shadow: 0 18px 48px rgba(0,0,0,0.46);
+      border-radius: 16px;
+      box-shadow: 0 16px 42px rgba(0,0,0,0.42);
       z-index: 9999;
       display: flex;
       flex-direction: column;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
       font-size: 13px;
-      transform: translateX(calc(100% + 28px));
+      transform: translateY(-50%) translateX(calc(100% + 28px));
       opacity: 0;
-      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+      transition: transform 0.16s cubic-bezier(0.2, 0, 0.2, 1), opacity 0.12s ease;
       overflow: hidden;
     }
     #gpt-toc-panel.open {
-      transform: translateX(0);
+      transform: translateY(-50%) translateX(0);
       opacity: 1;
     }
 
@@ -61,7 +61,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 18px 20px 12px;
+      padding: 14px 16px 10px;
       border-bottom: 1px solid rgba(255,255,255,0.08);
       flex-shrink: 0;
     }
@@ -79,7 +79,7 @@
       cursor: pointer;
       font-size: 18px;
       line-height: 1;
-      padding: 2px 0 2px 8px;
+      padding: 2px 0 2px 6px;
       transition: color 0.15s;
     }
     #gpt-toc-close-btn:hover { color: #fff; }
@@ -88,7 +88,7 @@
     #gpt-toc-scroll {
       flex: 1;
       overflow-y: scroll;
-      padding: 10px 14px 72px;
+      padding: 8px 10px 66px;
       scrollbar-width: none;          /* Firefox */
       -ms-overflow-style: none;       /* IE/Edge */
     }
@@ -98,7 +98,7 @@
 
     /* ── 会话分组 ── */
     .toc-session {
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     /* 会话标题行（用户提问） */
@@ -106,10 +106,10 @@
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      padding: 10px 10px 8px;
+      padding: 9px 8px 7px;
       cursor: pointer;
-      gap: 10px;
-      border-radius: 12px;
+      gap: 8px;
+      border-radius: 10px;
       transition: background 0.15s;
     }
     .toc-session-header:hover {
@@ -118,7 +118,7 @@
     .toc-session-title {
       color: #f4f4f4;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.35;
       flex: 1;
       word-break: break-all;
@@ -154,16 +154,16 @@
       align-items: flex-start;
       justify-content: space-between;
       cursor: pointer;
-      padding: 7px 8px 7px 0;
+      padding: 6px 7px 6px 0;
       color: #d3d3d3;
       line-height: 1.45;
-      gap: 8px;
+      gap: 6px;
       transition: color 0.15s, background 0.15s;
       border: none;
       background: none;
       width: 100%;
       text-align: left;
-      border-radius: 10px;
+      border-radius: 8px;
     }
     .toc-heading:hover { color: #fff; background: rgba(255,255,255,0.05); }
     .toc-heading.active { color: #fff; background: rgba(255,255,255,0.08); font-weight: 700; }
@@ -181,10 +181,10 @@
     }
 
     /* 缩进层级 */
-    .toc-h1 .toc-heading { padding-left: 10px; font-size: 13.5px; color: #eee; font-weight: 700; }
-    .toc-h2 .toc-heading { padding-left: 22px; font-size: 13px; color: #ddd; font-weight: 700; }
-    .toc-h3 .toc-heading { padding-left: 38px; font-size: 12.5px; color: #bdbdbd; }
-    .toc-h4 .toc-heading { padding-left: 52px; font-size: 12px; color: #9c9c9c; }
+    .toc-h1 .toc-heading { padding-left: 8px; font-size: 13px; color: #eee; font-weight: 700; }
+    .toc-h2 .toc-heading { padding-left: 17px; font-size: 12.5px; color: #ddd; font-weight: 700; }
+    .toc-h3 .toc-heading { padding-left: 28px; font-size: 12px; color: #bdbdbd; }
+    .toc-h4 .toc-heading { padding-left: 38px; font-size: 11.5px; color: #9c9c9c; }
 
     /* h2 折叠子项 */
     .toc-h2-group { }
@@ -255,12 +255,13 @@
 
     @media (max-width: 720px) {
       #gpt-toc-panel {
-        top: 12px;
-        right: 12px;
-        bottom: 68px;
-        width: calc(100vw - 24px);
-        max-height: calc(100vh - 80px);
-        border-radius: 20px;
+        top: 50%;
+        right: 18px;
+        bottom: auto;
+        width: calc(100vw - 36px);
+        height: min(72vh, 620px);
+        max-height: calc(100vh - 112px);
+        border-radius: 16px;
       }
       #gpt-toc-fab {
         right: 14px;
@@ -301,7 +302,7 @@
     document.body.classList.add('toc-open');
     lastTOCSignature = null;
     startTOCObserver();
-    refresh();
+    requestAnimationFrame(refresh);
   }
   function closeTOC() {
     panel.classList.remove('open');
@@ -574,7 +575,7 @@
   }
   function scheduleRefresh() {
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(refresh, 450);
+    refreshTimer = setTimeout(refresh, 120);
   }
 
   // ─── DOM 变化监听 ─────────────────────────────────────────────────────────────
@@ -619,7 +620,7 @@
     scrollEl.innerHTML = '<div class="toc-empty">正在加载当前会话目录...</div>';
     rebindTOCObserver();
 
-    [200, 800, 1800, 3500].forEach(delay => {
+    [80, 300, 900, 1800, 3500].forEach(delay => {
       routeRefreshTimers.push(setTimeout(() => {
         rebindTOCObserver();
         refresh();
