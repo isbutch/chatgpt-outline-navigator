@@ -2,6 +2,10 @@
 
 为 ChatGPT 添加可折叠的侧边目录，方便在长对话中快速浏览和跳转消息。
 
+## 效果图
+
+![ChatGPT Outline Navigator 效果图](./images/demo.png)
+
 ## 功能
 
 - 自动为 ChatGPT 对话生成侧边目录
