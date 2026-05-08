@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Outline Navigator
 // @namespace    http://tampermonkey.net/
-// @version      2.2.1
+// @version      2.2.2
 // @description  为 ChatGPT 添加可折叠侧边目录，支持 Alt+C 快捷键切换显示
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -29,11 +29,14 @@
   addStyle(`
     /* ── 面板 ── */
     #gpt-toc-panel {
+      --toc-panel-right: max(18px, env(safe-area-inset-right));
+      --toc-panel-width: clamp(236px, 17vw, 292px);
       position: fixed;
       top: 50%;
-      right: max(34px, env(safe-area-inset-right));
+      right: var(--toc-panel-right);
       bottom: auto;
-      width: clamp(236px, 17vw, 292px);
+      width: var(--toc-panel-width);
+      max-width: calc(100vw - var(--toc-panel-right) - var(--toc-panel-right));
       height: min(72vh, 680px);
       max-height: calc(100vh - 108px);
       background: #101010;
@@ -212,9 +215,10 @@
 
     /* ── 悬浮 FAB 按钮 ── */
     #gpt-toc-fab {
+      --toc-fab-right: 20px;
       position: fixed;
       bottom: 24px;
-      right: 20px;
+      right: var(--toc-fab-right);
       z-index: 10000;
       background: #fff;
       color: #111;
@@ -256,15 +260,17 @@
     @media (max-width: 720px) {
       #gpt-toc-panel {
         top: 50%;
-        right: 18px;
+        --toc-panel-right: 18px;
+        right: var(--toc-panel-right);
         bottom: auto;
-        width: calc(100vw - 36px);
+        --toc-panel-width: calc(100vw - 36px);
+        width: var(--toc-panel-width);
         height: min(72vh, 620px);
         max-height: calc(100vh - 112px);
         border-radius: 16px;
       }
       #gpt-toc-fab {
-        right: 14px;
+        --toc-fab-right: 14px;
         bottom: 16px;
       }
     }
@@ -295,9 +301,11 @@
   const headingById = new Map();
   const promptTextCache = new WeakMap();
   let activeHeadingBtn = null;
+  let layoutRaf = 0;
 
   // ─── 开关逻辑 ─────────────────────────────────────────────────────────────────
   function openTOC() {
+    updateTOCLayout();
     panel.classList.add('open');
     document.body.classList.add('toc-open');
     lastTOCSignature = null;
@@ -315,9 +323,76 @@
     panel.classList.contains('open') ? closeTOC() : openTOC();
   }
 
+  function scheduleLayoutUpdate() {
+    if (layoutRaf) return;
+    layoutRaf = requestAnimationFrame(() => {
+      layoutRaf = 0;
+      updateTOCLayout();
+    });
+  }
+
+  function updateTOCLayout() {
+    const docEl = document.documentElement;
+    const vw = docEl.clientWidth || window.innerWidth;
+    const vh = docEl.clientHeight || window.innerHeight;
+
+    if (vw <= 720) {
+      panel.style.setProperty('--toc-panel-right', '18px');
+      panel.style.setProperty('--toc-panel-width', 'calc(100vw - 36px)');
+      fab.style.setProperty('--toc-fab-right', '14px');
+      return;
+    }
+
+    const viewportMargin = clampNumber(Math.round(vw * 0.018), 16, 34);
+    const desiredWidth = clampNumber(Math.round(vw * 0.17), 236, 292);
+    const gap = 16;
+    const contentRight = getVisibleContentRight(vw, vh);
+    const rightRail = vw - contentRight - viewportMargin;
+
+    let panelRight = viewportMargin;
+    let panelWidth = desiredWidth;
+
+    if (rightRail >= desiredWidth + gap) {
+      panelRight = Math.max(viewportMargin, Math.round(vw - contentRight - desiredWidth - gap));
+    } else if (vw < 1100) {
+      panelWidth = Math.min(desiredWidth, vw - viewportMargin * 2);
+    }
+
+    panel.style.setProperty('--toc-panel-right', `${panelRight}px`);
+    panel.style.setProperty('--toc-panel-width', `${panelWidth}px`);
+    fab.style.setProperty('--toc-fab-right', `${viewportMargin}px`);
+  }
+
+  function getVisibleContentRight(vw, vh) {
+    const main = document.querySelector('main') || document.body;
+    const candidates = main.querySelectorAll(
+      'article, [data-message-author-role], .markdown, .prose, pre, [class*="max-w-"]'
+    );
+    let contentRight = 0;
+
+    candidates.forEach(el => {
+      if (panel.contains(el) || fab.contains(el)) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 120 || rect.height < 20) return;
+      if (rect.bottom < 0 || rect.top > vh) return;
+      if (rect.left < 0 || rect.right > vw) return;
+      if (rect.width > vw * 0.9) return;
+      contentRight = Math.max(contentRight, rect.right);
+    });
+
+    return contentRight || Math.round(vw * 0.72);
+  }
+
+  function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
   fab.addEventListener('click', toggleTOC);
   closeBtn.addEventListener('click', closeTOC);
   scrollEl.addEventListener('click', handleTOCClick);
+  window.addEventListener('resize', scheduleLayoutUpdate);
+  window.addEventListener('orientationchange', scheduleLayoutUpdate);
+  window.addEventListener('scroll', scheduleLayoutUpdate, { passive: true });
 
   // Alt+C 快捷键
   document.addEventListener('keydown', (e) => {
@@ -566,6 +641,7 @@
   let lastTOCSignature = null;
   let lastKnownUrl = location.href;
   function refresh() {
+    updateTOCLayout();
     const turns = getConversationTurns();
     const signature = makeTOCSignature(turns);
     if (signature === lastTOCSignature) return;
