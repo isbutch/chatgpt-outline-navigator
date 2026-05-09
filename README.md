@@ -15,6 +15,13 @@
 
 ## 安装
 
+### 方式一：直接安装
+
+- [点击安装脚本](https://github.com/isbutch/chatgpt-outline-navigator/raw/main/chatgpt-outline-navigator.user.js)
+- [Greasy Fork 安装页](https://greasyfork.org/zh-CN/scripts/577239-chatgpt-outline-navigator)
+
+### 方式二：手动安装
+
 1. 在浏览器中安装 Tampermonkey。
 2. 新建用户脚本。
 3. 将 [chatgpt-outline-navigator.user.js](./chatgpt-outline-navigator.user.js) 的内容粘贴进去并保存。
