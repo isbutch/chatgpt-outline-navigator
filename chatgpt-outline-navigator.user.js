@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Outline Navigator
 // @namespace    http://tampermonkey.net/
-// @version      2.2.3
+// @version      2.2.4
 // @description  为 ChatGPT 添加可折叠侧边目录，支持 Alt+C 快捷键切换显示
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -101,40 +101,96 @@
 
     /* ── 会话分组 ── */
     .toc-session {
-      margin-bottom: 6px;
+      margin-bottom: 10px;
+      padding: 7px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
     }
 
     /* 会话标题行（用户提问） */
     .toc-session-header {
       display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      padding: 9px 8px 7px;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      padding: 9px 9px 9px 10px;
       cursor: pointer;
-      gap: 8px;
+      gap: 6px;
       border-radius: 10px;
-      transition: background 0.15s;
+      border: 1px solid rgba(125, 180, 255, 0.32);
+      border-left: 3px solid rgba(125, 180, 255, 0.85);
+      background:
+        linear-gradient(135deg, rgba(82, 139, 255, 0.22), rgba(76, 127, 220, 0.08)),
+        rgba(255,255,255,0.03);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
     }
     .toc-session-header:hover {
-      background: rgba(255,255,255,0.06);
+      background:
+        linear-gradient(135deg, rgba(82, 139, 255, 0.3), rgba(76, 127, 220, 0.12)),
+        rgba(255,255,255,0.04);
+      border-color: rgba(145, 194, 255, 0.5);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 5px 14px rgba(0,0,0,0.16);
+    }
+    .toc-session-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .toc-role-tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 10.5px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      font-weight: 700;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .toc-role-tag.user {
+      color: #cfe2ff;
+      background: rgba(95, 154, 252, 0.22);
+      border: 1px solid rgba(134, 181, 255, 0.35);
+    }
+    .toc-role-tag.assistant {
+      color: #d7f8e4;
+      background: rgba(75, 187, 125, 0.2);
+      border: 1px solid rgba(127, 227, 172, 0.34);
+    }
+    .toc-session-count {
+      font-size: 11px;
+      color: #a2a2a2;
+      margin-left: auto;
+      margin-right: 4px;
+      white-space: nowrap;
     }
     .toc-session-title {
       color: #f4f4f4;
-      font-weight: 700;
+      font-weight: 600;
       font-size: 13px;
       line-height: 1.35;
-      flex: 1;
       word-break: break-all;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    .toc-session-prompt {
+      color: #f3f8ff;
+      font-size: 13.5px;
+      line-height: 1.42;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.2);
+    }
     .toc-chevron {
       color: #d8d8d8;
       font-size: 12px;
       flex-shrink: 0;
-      margin-top: 2px;
+      margin-top: 0;
+      margin-left: auto;
       transition: transform 0.2s;
       user-select: none;
     }
@@ -144,11 +200,26 @@
 
     /* 会话内容区 */
     .toc-session-body {
+      position: relative;
       overflow: hidden;
-      padding: 0 0 4px;
+      margin-top: 7px;
+      padding: 8px 0 4px 8px;
+      border-left: 1px solid rgba(127, 227, 172, 0.18);
     }
     .toc-session.collapsed .toc-session-body {
       display: none;
+    }
+    .toc-reply-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 0 5px -3px;
+      padding: 4px 6px 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .toc-reply-label .toc-session-count {
+      color: #8faaa0;
+      font-size: 10.5px;
     }
 
     /* ── 标题项 ── */
@@ -184,10 +255,10 @@
     }
 
     /* 缩进层级 */
-    .toc-h1 .toc-heading { padding-left: 8px; font-size: 13px; color: #eee; font-weight: 700; }
-    .toc-h2 .toc-heading { padding-left: 17px; font-size: 12.5px; color: #ddd; font-weight: 700; }
-    .toc-h3 .toc-heading { padding-left: 28px; font-size: 12px; color: #bdbdbd; }
-    .toc-h4 .toc-heading { padding-left: 38px; font-size: 11.5px; color: #9c9c9c; }
+    .toc-h1 .toc-heading { padding-left: 7px; font-size: 13px; color: #eee; font-weight: 700; }
+    .toc-h2 .toc-heading { padding-left: 16px; font-size: 12.5px; color: #ddd; font-weight: 700; }
+    .toc-h3 .toc-heading { padding-left: 27px; font-size: 12px; color: #bdbdbd; }
+    .toc-h4 .toc-heading { padding-left: 37px; font-size: 11.5px; color: #9c9c9c; }
 
     /* h2 折叠子项 */
     .toc-h2-group { }
@@ -202,7 +273,7 @@
     .toc-session-divider {
       height: 1px;
       background: rgba(255,255,255,0.08);
-      margin: 8px 4px;
+      margin: 8px 4px 10px;
     }
 
     /* 空状态 */
@@ -485,14 +556,25 @@
     header.className = 'toc-session-header';
     header.title = turn.userText || turn.summary;
     header.innerHTML = `
-      <span class="toc-session-title">${escHtml(turn.summary || turn.userText)}</span>
-      <span class="toc-chevron">∨</span>
+      <div class="toc-session-meta">
+        <span class="toc-role-tag user">提问</span>
+        <span class="toc-chevron">∨</span>
+      </div>
+      <span class="toc-session-title toc-session-prompt">${escHtml(turn.summary || turn.userText)}</span>
     `;
     session.appendChild(header);
 
     // 内容区
     const body = document.createElement('div');
     body.className = 'toc-session-body';
+
+    const replyLabel = document.createElement('div');
+    replyLabel.className = 'toc-reply-label';
+    replyLabel.innerHTML = `
+      <span class="toc-role-tag assistant">回复目录</span>
+      <span class="toc-session-count">${turn.headings.length} 个标题</span>
+    `;
+    body.appendChild(replyLabel);
 
     // 将标题组织成树：h2 可折叠包裹其 h3/h4 子项
     let i = 0;
