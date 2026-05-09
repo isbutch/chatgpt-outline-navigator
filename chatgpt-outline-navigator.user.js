@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Outline Navigator
 // @namespace    http://tampermonkey.net/
-// @version      2.2.4
+// @version      2.2.5
 // @description  为 ChatGPT 添加可折叠侧边目录，支持 Alt+C 快捷键切换显示
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -101,11 +101,8 @@
 
     /* ── 会话分组 ── */
     .toc-session {
-      margin-bottom: 10px;
-      padding: 7px;
+      margin-bottom: 12px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
     }
 
     /* 会话标题行（用户提问） */
@@ -114,24 +111,15 @@
       flex-direction: column;
       align-items: stretch;
       justify-content: flex-start;
-      padding: 9px 9px 9px 10px;
+      padding: 10px 12px;
       cursor: pointer;
       gap: 6px;
       border-radius: 10px;
-      border: 1px solid rgba(125, 180, 255, 0.32);
-      border-left: 3px solid rgba(125, 180, 255, 0.85);
-      background:
-        linear-gradient(135deg, rgba(82, 139, 255, 0.22), rgba(76, 127, 220, 0.08)),
-        rgba(255,255,255,0.03);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
-      transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+      background: rgba(255,255,255,0.04);
+      transition: background 0.2s;
     }
     .toc-session-header:hover {
-      background:
-        linear-gradient(135deg, rgba(82, 139, 255, 0.3), rgba(76, 127, 220, 0.12)),
-        rgba(255,255,255,0.04);
-      border-color: rgba(145, 194, 255, 0.5);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 5px 14px rgba(0,0,0,0.16);
+      background: rgba(255,255,255,0.08);
     }
     .toc-session-meta {
       display: flex;
@@ -202,9 +190,8 @@
     .toc-session-body {
       position: relative;
       overflow: hidden;
-      margin-top: 7px;
-      padding: 8px 0 4px 8px;
-      border-left: 1px solid rgba(127, 227, 172, 0.18);
+      margin-top: 4px;
+      padding: 6px 0 4px 10px;
     }
     .toc-session.collapsed .toc-session-body {
       display: none;
@@ -213,9 +200,8 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      margin: 0 0 5px -3px;
+      margin: 0 0 5px 0;
       padding: 4px 6px 5px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.07);
     }
     .toc-reply-label .toc-session-count {
       color: #8faaa0;
