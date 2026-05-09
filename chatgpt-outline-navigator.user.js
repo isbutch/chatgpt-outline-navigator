@@ -372,6 +372,7 @@
   const headingById = new Map();
   const promptTextCache = new WeakMap();
   let activeHeadingBtn = null;
+  let tocAutoScrollRaf = 0;
   let layoutRaf = 0;
 
   // ─── 开关逻辑 ─────────────────────────────────────────────────────────────────
@@ -690,7 +691,31 @@
   function setActiveHeading(id) {
     if (activeHeadingBtn) activeHeadingBtn.classList.remove('active');
     activeHeadingBtn = scrollEl.querySelector(`[data-target-id="${id}"] .toc-heading`);
-    if (activeHeadingBtn) activeHeadingBtn.classList.add('active');
+    if (!activeHeadingBtn) return;
+    activeHeadingBtn.classList.add('active');
+    keepActiveHeadingVisible();
+  }
+
+  function keepActiveHeadingVisible() {
+    if (!activeHeadingBtn || tocAutoScrollRaf) return;
+    tocAutoScrollRaf = requestAnimationFrame(() => {
+      tocAutoScrollRaf = 0;
+      const itemRect = activeHeadingBtn.getBoundingClientRect();
+      const scrollRect = scrollEl.getBoundingClientRect();
+      const margin = 18;
+
+      if (itemRect.top < scrollRect.top + margin) {
+        scrollEl.scrollBy({
+          top: itemRect.top - scrollRect.top - margin,
+          behavior: 'smooth'
+        });
+      } else if (itemRect.bottom > scrollRect.bottom - margin) {
+        scrollEl.scrollBy({
+          top: itemRect.bottom - scrollRect.bottom + margin,
+          behavior: 'smooth'
+        });
+      }
+    });
   }
 
   // ─── 滚动高亮 ─────────────────────────────────────────────────────────────────
