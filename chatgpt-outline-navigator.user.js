@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Outline Navigator
 // @namespace    http://tampermonkey.net/
-// @version      2.2.5
+// @version      2.3.0
 // @description  为 ChatGPT 添加可折叠侧边目录，支持 Alt+C 快捷键切换显示
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -27,6 +27,216 @@
 
   // ─── 样式 ────────────────────────────────────────────────────────────────────
   addStyle(`
+    :root {
+      /* ── 浅色主题 ── */
+      --toc-bg: var(--main-surface-primary, #ffffff);
+      --toc-color: var(--text-primary, #212121);
+      --toc-border: var(--border-medium, rgba(0, 0, 0, 0.08));
+      --toc-header-border: var(--border-light, rgba(0, 0, 0, 0.06));
+      --toc-shadow: 0 16px 42px rgba(0, 0, 0, 0.08);
+      --toc-title-color: var(--text-secondary, #666666);
+      --toc-close-btn-color: var(--text-secondary, #888888);
+      --toc-close-btn-hover-color: var(--text-primary, #111111);
+      
+      --toc-session-bg: var(--main-surface-secondary, rgba(0, 0, 0, 0.03));
+      --toc-session-hover: rgba(0, 0, 0, 0.06);
+      --toc-session-title: var(--text-primary, #1a1a1a);
+      --toc-session-prompt: var(--text-primary, #212121);
+      --toc-session-count: var(--text-secondary, #666666);
+      --toc-chevron: var(--text-secondary, #777777);
+      
+      --toc-heading-color: var(--text-secondary, #444444);
+      --toc-heading-hover: rgba(0, 0, 0, 0.04);
+      --toc-heading-hover-color: var(--text-primary, #111111);
+      --toc-heading-active-bg: rgba(16, 163, 127, 0.08);
+      --toc-heading-active-color: #0f766e;
+      --toc-active-line: #10a37f;
+      
+      --toc-h1-color: var(--text-primary, #1a1a1a);
+      --toc-h2-color: var(--text-primary, #2d2d2d);
+      --toc-h3-color: var(--text-secondary, #4a4a4a);
+      --toc-h4-color: var(--text-secondary, #666666);
+      
+      --toc-session-divider: var(--border-light, rgba(0, 0, 0, 0.06));
+      --toc-empty-color: var(--text-secondary, #888888);
+      
+      /* FAB 按钮 */
+      --toc-fab-bg: var(--main-surface-primary, #ffffff);
+      --toc-fab-color: var(--text-primary, #212121);
+      --toc-fab-hover-bg: var(--main-surface-secondary, #f5f5f7);
+      --toc-fab-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
+      --toc-fab-shortcut: var(--text-secondary, #888888);
+      
+      /* 角色标签 */
+      --toc-tag-user-color: #094a9a;
+      --toc-tag-user-bg: #e6f0ff;
+      --toc-tag-user-border: #b3d4ff;
+      --toc-tag-assistant-color: #1b5e20;
+      --toc-tag-assistant-bg: #e8f5e9;
+      --toc-tag-assistant-border: #a5d6a7;
+      
+      --toc-reply-count-color: #2e7d32;
+      --toc-text-shadow: none;
+    }
+
+    /* ── 深色主题 (通过 prefers-color-scheme 自动匹配) ── */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --toc-bg: var(--main-surface-primary, #202123); /* 优化深色：使用更柔和的深灰色，代替刺眼的纯黑 #101010 */
+        --toc-color: var(--text-primary, #ececf1);
+        --toc-border: var(--border-medium, rgba(255, 255, 255, 0.12));
+        --toc-header-border: var(--border-light, rgba(255, 255, 255, 0.08));
+        --toc-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
+        --toc-title-color: var(--text-secondary, #9a9a9a);
+        --toc-close-btn-color: var(--text-secondary, #acacbe);
+        --toc-close-btn-hover-color: var(--text-primary, #ffffff);
+        
+        --toc-session-bg: var(--main-surface-secondary, rgba(255, 255, 255, 0.04));
+        --toc-session-hover: rgba(255, 255, 255, 0.08);
+        --toc-session-title: var(--text-primary, #f4f4f4);
+        --toc-session-prompt: var(--text-primary, #ececf1);
+        --toc-session-count: var(--text-secondary, #a2a2a2);
+        --toc-chevron: var(--text-secondary, #acacbe);
+        
+        --toc-heading-color: var(--text-secondary, #c5c5d2);
+        --toc-heading-hover: rgba(255, 255, 255, 0.05);
+        --toc-heading-hover-color: var(--text-primary, #ffffff);
+        --toc-heading-active-bg: rgba(16, 163, 127, 0.16);
+        --toc-heading-active-color: #ffffff;
+        --toc-active-line: #10a37f;
+        
+        --toc-h1-color: var(--text-primary, #eee);
+        --toc-h2-color: var(--text-primary, #ddd);
+        --toc-h3-color: var(--text-secondary, #bdbdbd);
+        --toc-h4-color: var(--text-secondary, #9c9c9c);
+        
+        --toc-session-divider: var(--border-light, rgba(255, 255, 255, 0.08));
+        --toc-empty-color: var(--text-secondary, #777777);
+        
+        /* FAB 按钮 */
+        --toc-fab-bg: var(--main-surface-primary, #202123);
+        --toc-fab-color: var(--text-primary, #ececf1);
+        --toc-fab-hover-bg: var(--main-surface-secondary, #2d2d2d);
+        --toc-fab-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+        --toc-fab-shortcut: var(--text-secondary, #acacbe);
+        
+        /* 角色标签 */
+        --toc-tag-user-color: #cfe2ff;
+        --toc-tag-user-bg: rgba(95, 154, 252, 0.22);
+        --toc-tag-user-border: rgba(134, 181, 255, 0.35);
+        --toc-tag-assistant-color: #d7f8e4;
+        --toc-tag-assistant-bg: rgba(75, 187, 125, 0.2);
+        --toc-tag-assistant-border: rgba(127, 227, 172, 0.34);
+        
+        --toc-reply-count-color: #8faaa0;
+        --toc-text-shadow: 0 1px 0 rgba(0,0,0,0.2);
+      }
+    }
+
+    /* ── 深色主题 (支持 ChatGPT 等页面显式切换的 .dark / [data-theme="dark"] 类名) ── */
+    .dark, html.dark, body.dark, [data-theme="dark"] {
+      --toc-bg: var(--main-surface-primary, #202123);
+      --toc-color: var(--text-primary, #ececf1);
+      --toc-border: var(--border-medium, rgba(255, 255, 255, 0.12));
+      --toc-header-border: var(--border-light, rgba(255, 255, 255, 0.08));
+      --toc-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
+      --toc-title-color: #9a9a9a;
+      --toc-close-btn-color: #acacbe;
+      --toc-close-btn-hover-color: #ffffff;
+      
+      --toc-session-bg: var(--main-surface-secondary, rgba(255, 255, 255, 0.04));
+      --toc-session-hover: rgba(255, 255, 255, 0.08);
+      --toc-session-title: var(--text-primary, #f4f4f4);
+      --toc-session-prompt: var(--text-primary, #ececf1);
+      --toc-session-count: var(--text-secondary, #a2a2a2);
+      --toc-chevron: var(--text-secondary, #acacbe);
+      
+      --toc-heading-color: var(--text-secondary, #c5c5d2);
+      --toc-heading-hover: rgba(255, 255, 255, 0.05);
+      --toc-heading-hover-color: var(--text-primary, #ffffff);
+      --toc-heading-active-bg: rgba(16, 163, 127, 0.16);
+      --toc-heading-active-color: #ffffff;
+      --toc-active-line: #10a37f;
+      
+      --toc-h1-color: var(--text-primary, #eee);
+      --toc-h2-color: var(--text-primary, #ddd);
+      --toc-h3-color: var(--text-secondary, #bdbdbd);
+      --toc-h4-color: var(--text-secondary, #9c9c9c);
+      
+      --toc-session-divider: var(--border-light, rgba(255, 255, 255, 0.08));
+      --toc-empty-color: var(--text-secondary, #777777);
+      
+      /* FAB 按钮 */
+      --toc-fab-bg: var(--main-surface-primary, #202123);
+      --toc-fab-color: var(--text-primary, #ececf1);
+      --toc-fab-hover-bg: var(--main-surface-secondary, #2d2d2d);
+      --toc-fab-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+      --toc-fab-shortcut: var(--text-secondary, #acacbe);
+      
+      /* 角色标签 */
+      --toc-tag-user-color: #cfe2ff;
+      --toc-tag-user-bg: rgba(95, 154, 252, 0.22);
+      --toc-tag-user-border: rgba(134, 181, 255, 0.35);
+      --toc-tag-assistant-color: #d7f8e4;
+      --toc-tag-assistant-bg: rgba(75, 187, 125, 0.2);
+      --toc-tag-assistant-border: rgba(127, 227, 172, 0.34);
+      
+      --toc-reply-count-color: #8faaa0;
+      --toc-text-shadow: 0 1px 0 rgba(0,0,0,0.2);
+    }
+
+    /* ── 浅色主题 (支持 ChatGPT 等页面显式切换的 .light / [data-theme="light"] 类名) ── */
+    .light, html.light, body.light, [data-theme="light"] {
+      --toc-bg: var(--main-surface-primary, #ffffff);
+      --toc-color: var(--text-primary, #212121);
+      --toc-border: var(--border-medium, rgba(0, 0, 0, 0.08));
+      --toc-header-border: var(--border-light, rgba(0, 0, 0, 0.06));
+      --toc-shadow: 0 16px 42px rgba(0, 0, 0, 0.08);
+      --toc-title-color: #666666;
+      --toc-close-btn-color: #888888;
+      --toc-close-btn-hover-color: #111111;
+      
+      --toc-session-bg: var(--main-surface-secondary, rgba(0, 0, 0, 0.03));
+      --toc-session-hover: rgba(0, 0, 0, 0.06);
+      --toc-session-title: var(--text-primary, #1a1a1a);
+      --toc-session-prompt: var(--text-primary, #212121);
+      --toc-session-count: var(--text-secondary, #666666);
+      --toc-chevron: var(--text-secondary, #777777);
+      
+      --toc-heading-color: var(--text-secondary, #444444);
+      --toc-heading-hover: rgba(0, 0, 0, 0.04);
+      --toc-heading-hover-color: var(--text-primary, #111111);
+      --toc-heading-active-bg: rgba(16, 163, 127, 0.08);
+      --toc-heading-active-color: #0f766e;
+      --toc-active-line: #10a37f;
+      
+      --toc-h1-color: var(--text-primary, #1a1a1a);
+      --toc-h2-color: var(--text-primary, #2d2d2d);
+      --toc-h3-color: var(--text-secondary, #4a4a4a);
+      --toc-h4-color: var(--text-secondary, #666666);
+      
+      --toc-session-divider: rgba(0, 0, 0, 0.06);
+      --toc-empty-color: #888888;
+      
+      /* FAB 按钮 */
+      --toc-fab-bg: var(--main-surface-primary, #ffffff);
+      --toc-fab-color: var(--text-primary, #212121);
+      --toc-fab-hover-bg: var(--main-surface-secondary, #f5f5f7);
+      --toc-fab-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
+      --toc-fab-shortcut: var(--text-secondary, #888888);
+      
+      /* 角色标签 */
+      --toc-tag-user-color: #094a9a;
+      --toc-tag-user-bg: #e6f0ff;
+      --toc-tag-user-border: #b3d4ff;
+      --toc-tag-assistant-color: #1b5e20;
+      --toc-tag-assistant-bg: #e8f5e9;
+      --toc-tag-assistant-border: #a5d6a7;
+      
+      --toc-reply-count-color: #2e7d32;
+      --toc-text-shadow: none;
+    }
+
     /* ── 面板 ── */
     #gpt-toc-panel {
       --toc-panel-right: max(18px, env(safe-area-inset-right));
@@ -39,11 +249,11 @@
       max-width: calc(100vw - var(--toc-panel-right) - var(--toc-panel-right));
       height: min(72vh, 680px);
       max-height: calc(100vh - 108px);
-      background: #101010;
-      color: #f4f4f4;
-      border: 1px solid rgba(255,255,255,0.14);
+      background: var(--toc-bg);
+      color: var(--toc-color);
+      border: 1px solid var(--toc-border);
       border-radius: 16px;
-      box-shadow: 0 16px 42px rgba(0,0,0,0.42);
+      box-shadow: var(--toc-shadow);
       z-index: 9999;
       display: flex;
       flex-direction: column;
@@ -65,11 +275,11 @@
       align-items: center;
       justify-content: space-between;
       padding: 14px 16px 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      border-bottom: 1px solid var(--toc-header-border);
       flex-shrink: 0;
     }
     #gpt-toc-panel-title {
-      color: #8d8d8d;
+      color: var(--toc-title-color);
       font-size: 11px;
       font-weight: 600;
       letter-spacing: 1px;
@@ -78,14 +288,14 @@
     #gpt-toc-close-btn {
       background: none;
       border: none;
-      color: #777;
+      color: var(--toc-close-btn-color);
       cursor: pointer;
       font-size: 18px;
       line-height: 1;
       padding: 2px 0 2px 6px;
       transition: color 0.15s;
     }
-    #gpt-toc-close-btn:hover { color: #fff; }
+    #gpt-toc-close-btn:hover { color: var(--toc-close-btn-hover-color); }
 
     /* ── 滚动区（隐藏滚动条） ── */
     #gpt-toc-scroll {
@@ -115,11 +325,11 @@
       cursor: pointer;
       gap: 6px;
       border-radius: 10px;
-      background: rgba(255,255,255,0.04);
+      background: var(--toc-session-bg);
       transition: background 0.2s;
     }
     .toc-session-header:hover {
-      background: rgba(255,255,255,0.08);
+      background: var(--toc-session-hover);
     }
     .toc-session-meta {
       display: flex;
@@ -140,24 +350,24 @@
       flex-shrink: 0;
     }
     .toc-role-tag.user {
-      color: #cfe2ff;
-      background: rgba(95, 154, 252, 0.22);
-      border: 1px solid rgba(134, 181, 255, 0.35);
+      color: var(--toc-tag-user-color);
+      background: var(--toc-tag-user-bg);
+      border: 1px solid var(--toc-tag-user-border);
     }
     .toc-role-tag.assistant {
-      color: #d7f8e4;
-      background: rgba(75, 187, 125, 0.2);
-      border: 1px solid rgba(127, 227, 172, 0.34);
+      color: var(--toc-tag-assistant-color);
+      background: var(--toc-tag-assistant-bg);
+      border: 1px solid var(--toc-tag-assistant-border);
     }
     .toc-session-count {
       font-size: 11px;
-      color: #a2a2a2;
+      color: var(--toc-session-count);
       margin-left: auto;
       margin-right: 4px;
       white-space: nowrap;
     }
     .toc-session-title {
-      color: #f4f4f4;
+      color: var(--toc-session-title);
       font-weight: 600;
       font-size: 13px;
       line-height: 1.35;
@@ -168,13 +378,13 @@
       overflow: hidden;
     }
     .toc-session-prompt {
-      color: #f3f8ff;
+      color: var(--toc-session-prompt);
       font-size: 13.5px;
       line-height: 1.42;
-      text-shadow: 0 1px 0 rgba(0,0,0,0.2);
+      text-shadow: var(--toc-text-shadow);
     }
     .toc-chevron {
-      color: #d8d8d8;
+      color: var(--toc-chevron);
       font-size: 12px;
       flex-shrink: 0;
       margin-top: 0;
@@ -204,18 +414,17 @@
       padding: 4px 6px 5px 0;
     }
     .toc-reply-label .toc-session-count {
-      color: #8faaa0;
+      color: var(--toc-reply-count-color);
       font-size: 10.5px;
     }
 
-    /* ── 标题项 ── */
     .toc-heading {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       cursor: pointer;
       padding: 6px 7px 6px 0;
-      color: #d3d3d3;
+      color: var(--toc-heading-color);
       line-height: 1.45;
       gap: 6px;
       transition: color 0.15s, background 0.15s;
@@ -224,9 +433,31 @@
       width: 100%;
       text-align: left;
       border-radius: 8px;
+      position: relative;
     }
-    .toc-heading:hover { color: #fff; background: rgba(255,255,255,0.05); }
-    .toc-heading.active { color: #fff; background: rgba(255,255,255,0.08); font-weight: 700; }
+    .toc-heading::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 0;
+      background-color: var(--toc-active-line);
+      border-radius: 99px;
+      transition: height 0.15s ease, opacity 0.15s ease;
+      opacity: 0;
+    }
+    .toc-heading:hover { color: var(--toc-heading-hover-color); background: var(--toc-heading-hover); }
+    .toc-heading.active {
+      color: var(--toc-heading-active-color) !important;
+      background: var(--toc-heading-active-bg);
+      font-weight: 700;
+    }
+    .toc-heading.active::before {
+      height: 14px;
+      opacity: 1;
+    }
 
     .toc-heading-text {
       flex: 1;
@@ -241,10 +472,10 @@
     }
 
     /* 缩进层级 */
-    .toc-h1 .toc-heading { padding-left: 7px; font-size: 13px; color: #eee; font-weight: 700; }
-    .toc-h2 .toc-heading { padding-left: 16px; font-size: 12.5px; color: #ddd; font-weight: 700; }
-    .toc-h3 .toc-heading { padding-left: 27px; font-size: 12px; color: #bdbdbd; }
-    .toc-h4 .toc-heading { padding-left: 37px; font-size: 11.5px; color: #9c9c9c; }
+    .toc-h1 .toc-heading { padding-left: 7px; font-size: 13px; color: var(--toc-h1-color); font-weight: 700; }
+    .toc-h2 .toc-heading { padding-left: 16px; font-size: 12.5px; color: var(--toc-h2-color); font-weight: 700; }
+    .toc-h3 .toc-heading { padding-left: 27px; font-size: 12px; color: var(--toc-h3-color); }
+    .toc-h4 .toc-heading { padding-left: 37px; font-size: 11.5px; color: var(--toc-h4-color); }
 
     /* h2 折叠子项 */
     .toc-h2-group { }
@@ -258,14 +489,14 @@
     /* 会话间分割线 */
     .toc-session-divider {
       height: 1px;
-      background: rgba(255,255,255,0.08);
+      background: var(--toc-session-divider);
       margin: 8px 4px 10px;
     }
 
     /* 空状态 */
     .toc-empty {
       padding: 20px 10px;
-      color: #777;
+      color: var(--toc-empty-color);
       font-size: 12px;
       font-style: italic;
     }
@@ -277,9 +508,9 @@
       bottom: 24px;
       right: var(--toc-fab-right);
       z-index: 10000;
-      background: #fff;
-      color: #111;
-      border: none;
+      background: var(--toc-fab-bg);
+      color: var(--toc-fab-color);
+      border: 1px solid var(--toc-border);
       border-radius: 999px;
       padding: 9px 16px;
       display: flex;
@@ -288,13 +519,13 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.35);
-      transition: background 0.15s, transform 0.1s;
+      box-shadow: var(--toc-fab-shadow);
+      transition: background 0.15s, transform 0.1s, border-color 0.15s;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       user-select: none;
     }
     #gpt-toc-fab:hover {
-      background: #f0f0f0;
+      background: var(--toc-fab-hover-bg);
       transform: scale(1.03);
     }
     #gpt-toc-fab:active { transform: scale(0.97); }
@@ -302,7 +533,7 @@
     #gpt-toc-fab .fab-label { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; }
     #gpt-toc-fab .fab-shortcut {
       font-size: 11px;
-      color: #888;
+      color: var(--toc-fab-shortcut);
       font-weight: 500;
       margin-left: 2px;
     }
@@ -628,8 +859,20 @@
   }
 
   function scrollTo(h) {
+    isProgrammaticScrolling = true;
+    clearTimeout(programmaticScrollTimer);
+
     h.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setActiveHeading(h.id);
+
+    const clearScrollFlag = () => {
+      isProgrammaticScrolling = false;
+      clearTimeout(programmaticScrollTimer);
+    };
+
+    // 监听 scrollend 事件（现代浏览器支持），或通过定时器兜底
+    window.addEventListener('scrollend', clearScrollFlag, { once: true });
+    programmaticScrollTimer = setTimeout(clearScrollFlag, 800);
   }
 
   function renderTOC(turns) {
@@ -706,6 +949,8 @@
 
   // ─── 滚动高亮 ─────────────────────────────────────────────────────────────────
   let intersectionObs = null;
+  let isProgrammaticScrolling = false;
+  let programmaticScrollTimer = null;
 
   function setupHighlight(turns) {
     stopHighlight();
@@ -713,6 +958,7 @@
     if (!allHeadings.length) return;
 
     intersectionObs = new IntersectionObserver(entries => {
+      if (isProgrammaticScrolling) return;
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           setActiveHeading(entry.target.id);
